@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antenna Optimizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0A1929;
+    --grid-line: #16324F;
+    --panel: #0F2137;
+    --panel-border: #1E3A56;
+    --teal: #4FD1C5;
+    --teal-dim: #2E7A72;
+    --amber: #F2A65A;
+    --text-main: #E8F1F8;
+    --text-dim: #7B96AD;
+    --red: #E2685F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 32px 32px;
+    color: var(--text-main);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    padding: 40px 24px 80px;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--panel-border);
+    padding-bottom: 20px;
+  }
+
+  .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    color: var(--teal);
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+
+  h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 30px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .server-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .dot.ok { background: var(--teal); }
+  .dot.err { background: var(--red); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+    margin-top: 28px;
+  }
+
+  @media (max-width: 800px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 4px;
+    padding: 22px;
+  }
+
+  .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 18px;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .field { margin-bottom: 18px; }
+
+  input, select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--panel-border);
+    color: var(--text-main);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    padding: 10px 12px;
+    border-radius: 3px;
+  }
+
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+
+  .hint {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  button {
+    width: 100%;
+    background: var(--teal);
+    color: #04302B;
+    border: none;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 13px;
+    border-radius: 3px;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+
+  button:hover { background: #6EE0D4; }
+  button:disabled { background: var(--teal-dim); color: #0A1929; cursor: default; }
+
+  .error-box {
+    display: none;
+    background: rgba(226, 104, 95, 0.12);
+    border: 1px solid var(--red);
+    color: #F5B3AE;
+    font-size: 13px;
+    padding: 12px 14px;
+    border-radius: 3px;
+    margin-top: 16px;
+  }
+
+  .readout-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .readout {
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    padding: 14px 16px;
+    background: rgba(79, 209, 197, 0.03);
+  }
+
+  .readout-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin: 0 0 8px;
+  }
+
+  .readout-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--teal);
+    margin: 0;
+  }
+
+  .readout-value.amber { color: var(--amber); }
+  .readout-unit { font-size: 13px; color: var(--text-dim); margin-left: 4px; }
+
+  .scope-wrap {
+    border: 1px solid var(--panel-border);
+    border-radius: 3px;
+    padding: 16px;
+    background: #081420;
+    height: 280px;
+    position: relative;
+  }
+
+  .placeholder {
+    color: var(--text-dim);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    text-align: center;
+    padding-top: 100px;
+  }
+
+  .warnings {
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--amber);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .model-tag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 18px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">ML-driven patch antenna design</p>
+      <h1>Antenna Optimizer</h1>
+    </div>
+    <div class="server-status">
+      <span class="dot" id="statusDot"></span>
+      <span id="statusText">Checking backend...</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <div class="panel">
+      <p class="panel-title">Design inputs</p>
+
+      <div class="field">
+        <label for="freq">Operating frequency (GHz)</label>
+        <input type="number" id="freq" step="0.01" value="2.4" min="1" max="10">
+        <p class="hint">Valid range: 1.0 &ndash; 10.0 GHz</p>
+      </div>
+
+      <div class="field">
+        <label for="er">Substrate dielectric constant (&epsilon;r)</label>
+        <select id="er">
+          <option value="2.2">2.2 &mdash; RT/Duroid 5880</option>
+          <option value="2.33">2.33 &mdash; RT/Duroid 5870</option>
+          <option value="3.38">3.38 &mdash; Rogers RO4003C</option>
+          <option value="4.4" selected>4.4 &mdash; FR4</option>
+          <option value="6.15">6.15 &mdash; Rogers RO3006</option>
+          <option value="10.2">10.2 &mdash; Rogers RO3010</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="height">Substrate height (mm)</label>
+        <input type="number" id="height" step="0.01" value="1.6" min="0.5" max="3.2">
+        <p class="hint">Valid range: 0.5 &ndash; 3.2 mm</p>
+      </div>
+
+      <button id="predictBtn" onclick="runPrediction()">Predict dimensions</button>
+	<button id="reportBtn" onclick="downloadReport()" style="display:none; margin-top:10px; background:transparent;
+	 border:1px solid var(--amber); color:var(--amber);">Download PDF report</button>
+
+      <div class="error-box" id="errorBox"></div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Predicted design</p>
+
+      <div class="readout-grid" id="readoutGrid">
+        <div class="readout"><p class="readout-label">Patch width</p><p class="readout-value">&mdash;</p></div>
+        <div class="readout"><p class="readout-label">Patch length</p><p class="readout-value">&mdash;</p></div>
+        <div class="readout"><p class="readout-label">Gain</p><p class="readout-value">&mdash;</p></div>
+        <div class="readout"><p class="readout-label">Bandwidth</p><p class="readout-value">&mdash;</p></div>
+        <div class="readout"><p class="readout-label">S11 min</p><p class="readout-value">&mdash;</p></div>
+      </div>
+
+      <p class="panel-title">S11 vs frequency</p>
+      <div class="scope-wrap">
+        <div class="placeholder" id="scopePlaceholder">Run a prediction to see the return loss curve</div>
+        <canvas id="s11Chart" style="display:none;"></canvas>
+      </div>
+
+      <div class="warnings" id="warningsBox"></div>
+      <p class="model-tag" id="modelTag"></p>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const API_BASE = "http://127.0.0.1:8000";
+  let chart = null;
+
+  async function checkHealth() {
+    const dot = document.getElementById('statusDot');
+    const text = document.getElementById('statusText');
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      if (!res.ok) throw new Error();
+      dot.classList.add('ok');
+      text.textContent = 'Backend connected';
+    } catch (e) {
+      dot.classList.add('err');
+      text.textContent = 'Backend not reachable — is main.py running?';
+    }
+  }
+
+  function setReadouts(data) {
+    const grid = document.getElementById('readoutGrid');
+    grid.innerHTML = `
+      <div class="readout">
+        <p class="readout-label">Patch width</p>
+        <p class="readout-value">${data.patch_width_mm}<span class="readout-unit">mm</span></p>
+      </div>
+      <div class="readout">
+        <p class="readout-label">Patch length</p>
+        <p class="readout-value">${data.patch_length_mm}<span class="readout-unit">mm</span></p>
+      </div>
+      <div class="readout">
+        <p class="readout-label">Gain</p>
+        <p class="readout-value">${data.gain_dBi}<span class="readout-unit">dBi</span></p>
+      </div>
+      <div class="readout">
+        <p class="readout-label">Bandwidth</p>
+        <p class="readout-value">${data.bandwidth_percent}<span class="readout-unit">%</span></p>
+      </div>
+      <div class="readout">
+        <p class="readout-label">S11 min</p>
+        <p class="readout-value amber">${data.S11_min_dB}<span class="readout-unit">dB</span></p>
+      </div>
+    `;
+  }
+
+  function drawS11Chart(curve) {
+    document.getElementById('scopePlaceholder').style.display = 'none';
+    const canvas = document.getElementById('s11Chart');
+    canvas.style.display = 'block';
+
+    const labels = curve.map(p => p.frequency_GHz.toFixed(2));
+    const values = curve.map(p => p.S11_dB);
+
+    if (chart) chart.destroy();
+    chart = new Chart(canvas.getContext('2d'), {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          borderColor: '#4FD1C5',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.15,
+          fill: false,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 600 },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            title: { display: true, text: 'Frequency (GHz)', color: '#7B96AD', font: { family: 'IBM Plex Mono', size: 11 } },
+            ticks: { color: '#7B96AD', font: { family: 'IBM Plex Mono', size: 10 }, maxTicksLimit: 8 },
+            grid: { color: '#16324F' },
+          },
+          y: {
+            title: { display: true, text: 'S11 (dB)', color: '#7B96AD', font: { family: 'IBM Plex Mono', size: 11 } },
+            ticks: { color: '#7B96AD', font: { family: 'IBM Plex Mono', size: 10 } },
+            grid: { color: '#16324F' },
+          }
+        }
+      }
+    });
+  }
+
+  async function runPrediction() {
+    const btn = document.getElementById('predictBtn');
+    const errorBox = document.getElementById('errorBox');
+    const warningsBox = document.getElementById('warningsBox');
+    errorBox.style.display = 'none';
+    warningsBox.textContent = '';
+
+    const payload = {
+      frequency_GHz: parseFloat(document.getElementById('freq').value),
+      dielectric_constant: parseFloat(document.getElementById('er').value),
+      substrate_height_mm: parseFloat(document.getElementById('height').value),
+    };
+
+    btn.disabled = true;
+    btn.textContent = 'Predicting...';
+
+    try {
+      const res = await fetch(`${API_BASE}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Prediction failed');
+      }
+
+      const data = await res.json();
+      setReadouts(data);
+      drawS11Chart(data.s11_curve);
+
+      document.getElementById('modelTag').textContent = `Model: ${data.model_used}`;
+	document.getElementById('reportBtn').style.display = 'block';
+      if (data.warnings && data.warnings.length > 0) {
+        warningsBox.textContent = data.warnings.join(' ');
+      }
+
+    } catch (e) {
+      errorBox.textContent = e.message || 'Could not reach the backend. Make sure main.py is running on port 8000.';
+      errorBox.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Predict dimensions';
+    }
+  }
+	async function downloadReport() {
+    const payload = {
+      frequency_GHz: parseFloat(document.getElementById('freq').value),
+      dielectric_constant: parseFloat(document.getElementById('er').value),
+      substrate_height_mm: parseFloat(document.getElementById('height').value),
+    };
+
+    const btn = document.getElementById('reportBtn');
+    btn.disabled = true;
+    btn.textContent = 'Generating report...';
+
+    try {
+      const res = await fetch(`${API_BASE}/predict-report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Report generation failed');
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'antenna_design_report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (e) {
+      alert('Could not generate report. Make sure the backend is running.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Download PDF report';
+    }
+}
+  checkHealth();
+</script>
+
+</body>
+</html>
